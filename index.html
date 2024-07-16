@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Replacement Algorithms</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Page Replacement Algorithms</h1>
+        <div id="wizard">
+            <div class="step" id="step1">
+                <label for="sequence">Enter the sequence of pages (comma-separated):</label>
+                <input type="text" id="sequence" name="sequence" required>
+                <button class="nextBtn" onclick="nextStep(2)">Next</button>
+            </div>
+            <div class="step" id="step2" style="display:none;">
+                <label for="frameSize">Enter the number of frames:</label>
+                <input type="number" id="frameSize" name="frameSize" required>
+                <button class="prevBtn" onclick="prevStep(1)">Back</button>
+                <button class="nextBtn" onclick="nextStep(3)">Next</button>
+            </div>
+            <div class="step" id="step3" style="display:none;">
+                <label for="algorithm">Choose an algorithm:</label>
+                <select id="algorithm" name="algorithm" required>
+                    <option value="fifo">FIFO</option>
+                    <option value="lru">LRU</option>
+                    <option value="optimal">Optimal</option>
+                </select>
+                <button class="prevBtn" onclick="prevStep(2)">Back</button>
+                <button class="nextBtn" onclick="runAlgorithm()">Run Algorithm</button>
+            </div>
+        </div>
+        <div id="results" style="display:none;">
+            <h2>Results</h2>
+            <p id="finalFrame"></p>
+            <p id="pageFaults"></p>
+            <p id="pattern"></p>
+            <canvas id="patternChart"></canvas>
+        </div>
+    </div>
+    <script>
+        function nextStep(step) {
+            document.querySelectorAll('.step').forEach(s => s.style.display = 'none');
+            document.getElementById(`step${step}`).style.display = 'block';
+        }
+
+        function prevStep(step) {
+            document.querySelectorAll('.step').forEach(s => s.style.display = 'none');
+            document.getElementById(`step${step}`).style.display = 'block';
+        }
+
+        function runAlgorithm() {
+            const sequence = document.getElementById('sequence').value.split(',').map(Number);
+            const frameSize = parseInt(document.getElementById('frameSize').value);
+            const algorithm = document.getElementById('algorithm').value;
+
+            let result;
+            if (algorithm === 'fifo') {
+                result = fifo(sequence, frameSize);
+            } else if (algorithm === 'lru') {
+                result = lru(sequence, frameSize);
+            } else if (algorithm === 'optimal') {
+                result = optimal(sequence, frameSize);
+            }
+
+            document.getElementById('finalFrame').textContent = 'Final Frame: ' + result[0];
+            document.getElementById('pageFaults').textContent = 'Page Faults: ' + result[1];
+            document.getElementById('pattern').textContent = 'Pattern: ' + result[2].join(' ');
+
+            document.getElementById('results').style.display = 'block';
+            generateChart(sequence, result[2]);
+        }
+
+        function fifo(sequence, frameSize) {
+            let frame = Array(frameSize).fill(-1);
+            let pageFaults = 0;
+            let findex = 0;
+            let pattern = [];
+
+            for (let page of sequence) {
+                if (!frame.includes(page)) {
+                    pageFaults++;
+                    frame[findex] = page;
+                    pattern.push("Y");
+                    findex = (findex + 1) % frameSize;
+                } else {
+                    pattern.push("N");
+                }
+            }
+
+            return [frame, pageFaults, pattern];
+        }
+
+        function lru(sequence, frameSize) {
+            let frame = Array(frameSize).fill(-1);
+            let pageFaults = 0;
+            let pattern = [];
+
+            for (let i = 0; i < sequence.length; i++) {
+                let page = sequence[i];
+                if (!frame.includes(page)) {
+                    pageFaults++;
+                    if (frame.includes(-1)) {
+                        frame[frame.indexOf(-1)] = page;
+                    } else {
+                        let leastRecentlyUsedIndex = findLeastRecentlyUsedIndex(i, sequence, frame);
+                        frame[leastRecentlyUsedIndex] = page;
+                    }
+                    pattern.push("Y");
+                } else {
+                    pattern.push("N");
+                }
+            }
+
+            return [frame, pageFaults, pattern];
+        }
+
+        function findLeastRecentlyUsedIndex(currentIndex, sequence, frame) {
+            let leastRecentlyUsed = currentIndex;
+            let leastRecentlyUsedIndex = -1;
+
+            for (let j = 0; j < frame.length; j++) {
+                let lastUse = -1;
+                for (let k = currentIndex - 1; k >= 0; k--) {
+                    if (sequence[k] === frame[j]) {
+                        lastUse = k;
+                        break;
+                    }
+                }
+                if (lastUse < leastRecentlyUsed) {
+                    leastRecentlyUsed = lastUse;
+                    leastRecentlyUsedIndex = j;
+                }
+            }
+            return leastRecentlyUsedIndex;
+        }
+
+        function optimal(sequence, frameSize) {
+            let frame = Array(frameSize).fill(-1);
+            let pageFaults = 0;
+            let pattern = [];
+
+            for (let i = 0; i < sequence.length; i++) {
+                let page = sequence[i];
+                if (!frame.includes(page)) {
+                    pageFaults++;
+                    if (frame.includes(-1)) {
+                        frame[frame.indexOf(-1)] = page;
+                    } else {
+                        let optimalIndex = findOptimalIndex(i, sequence, frame);
+                        frame[optimalIndex] = page;
+                    }
+                    pattern.push("Y");
+                } else {
+                    pattern.push("N");
+                }
+            }
+
+            return [frame, pageFaults, pattern];
+        }
+
+        function findOptimalIndex(currentIndex, sequence, frame) {
+            let furthestUse = currentIndex;
+            let furthestUseIndex = -1;
+
+            for (let j = 0; j < frame.length; j++) {
+                let nextUse = Infinity;
+                for (let k = currentIndex + 1; k < sequence.length; k++) {
+                    if (sequence[k] === frame[j]) {
+                        nextUse = k;
+                        break;
+                    }
+                }
+                if (nextUse > furthestUse) {
+                    furthestUse = nextUse;
+                    furthestUseIndex = j;
+                }
+            }
+            return furthestUseIndex;
+        }
+
+        function generateChart(sequence, pattern) {
+            const ctx = document.getElementById('patternChart').getContext('2d');
+            const chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sequence,
+                    datasets: [{
+                        label: 'Page Replacement Pattern',
+                        data: pattern.map(p => p === 'Y' ? 1 : 0),
+                        backgroundColor: pattern.map(p => p === 'Y' ? 'rgba(255, 99, 132, 0.2)' : 'rgba(75, 192, 192, 0.2)'),
+                        borderColor: pattern.map(p => p === 'Y' ? 'rgba(255, 99, 132, 1)' : 'rgba(75, 192, 192, 1)'),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) { return value === 1 ? 'Page Fault' : 'No Fault'; }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.raw === 1 ? 'Page Fault' : 'No Fault';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
